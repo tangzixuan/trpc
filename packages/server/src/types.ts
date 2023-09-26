@@ -123,3 +123,6 @@ export type DeepPartial<TObject> = TObject extends object
 export type DistributiveOmit<TObj, TKey extends keyof any> = TObj extends any
   ? Omit<TObj, TKey>
   : never;
+
+// FIXME: is this needed?
+export {};

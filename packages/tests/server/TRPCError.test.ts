@@ -1,4 +1,5 @@
-import { getTRPCErrorFromUnknown, TRPCError } from '@trpc/server/src';
+import { TRPCError } from '@trpc/server';
+import { getTRPCErrorFromUnknown } from '@trpc/server/error/TRPCError';
 
 test('should extend original Error class', () => {
   const trpcError = new TRPCError({ code: 'FORBIDDEN' });

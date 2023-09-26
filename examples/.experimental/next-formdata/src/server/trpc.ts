@@ -7,8 +7,9 @@
  * @see https://trpc.io/docs/v10/router
  * @see https://trpc.io/docs/v10/procedures
  */
-import { inferAsyncReturnType, initTRPC } from '@trpc/server';
+import { initTRPC } from '@trpc/server';
 import * as trpcNext from '@trpc/server/adapters/next';
+import { inferAsyncReturnType } from '@trpc/server/unstableInternalsExport';
 import { ZodError } from 'zod';
 
 /**

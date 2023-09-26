@@ -9,7 +9,7 @@ import { getTRPCErrorFromUnknown, TRPCError } from '../error/TRPCError';
 import { TRPCResponse } from '../rpc';
 import { getErrorShape } from '../shared/getErrorShape';
 import { transformTRPCResponse } from '../shared/transformTRPCResponse';
-import { Maybe } from '../types';
+import { Maybe } from '../unstableInternalsExport';
 import {
   BaseContentTypeHandler,
   getJsonContentTypeInputs,

@@ -18,17 +18,19 @@ import {
   AnyRouter,
   callProcedure,
   ClientDataTransformerOptions,
-  Filter,
   inferProcedureInput,
   inferRouterContext,
-  Maybe,
-  ProtectedIntersection,
 } from '@trpc/server';
 import {
   createFlatProxy,
   createRecursiveProxy,
   inferTransformedProcedureOutput,
 } from '@trpc/server/shared';
+import {
+  Filter,
+  Maybe,
+  ProtectedIntersection,
+} from '@trpc/server/unstableInternalsExport';
 import { getQueryKeyInternal } from '../internals/getQueryKey';
 import {
   CreateTRPCReactQueryClientConfig,
