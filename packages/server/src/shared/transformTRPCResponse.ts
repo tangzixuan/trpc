@@ -1,5 +1,5 @@
-import { AnyRootConfig } from '../internals';
 import { TRPCResponse, TRPCResponseMessage } from '../rpc';
+import { AnyRootConfig } from '../unstableExternalsExport';
 
 function transformTRPCResponseItem<
   TResponseItem extends TRPCResponse | TRPCResponseMessage,

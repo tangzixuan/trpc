@@ -1,5 +1,5 @@
 import { AnyRouter } from '../core';
-import { AnyRootConfig } from '../internals';
+import { AnyRootConfig } from '../unstableExternalsExport';
 
 export type TRPCInferrable = AnyRouter | AnyRootConfig;
 export type inferConfig<TInferrable extends TRPCInferrable> =
