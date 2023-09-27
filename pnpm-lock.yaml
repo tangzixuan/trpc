@@ -424,9 +424,6 @@ importers:
 
   examples/.test/diagnostics-big-router:
     dependencies:
-      '@tanstack/react-query':
-        specifier: 4.18.0
-        version: 4.18.0(react-dom@18.2.0)(react@18.2.0)
       '@trpc/client':
         specifier: link:../../../packages/client
         version: link:../../../packages/client
@@ -439,15 +436,6 @@ importers:
       '@trpc/server':
         specifier: link:../../../packages/server
         version: link:../../../packages/server
-      next:
-        specifier: ^13.4.8
-        version: 13.4.8(@babel/core@7.21.8)(react-dom@18.2.0)(react@18.2.0)
-      react:
-        specifier: ^18.2.0
-        version: 18.2.0
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.2.0(react@18.2.0)
       zod:
         specifier: ^3.0.0
         version: 3.20.2
@@ -455,12 +443,6 @@ importers:
       '@types/node':
         specifier: ^18.16.16
         version: 18.16.16
-      '@types/react':
-        specifier: ^18.2.8
-        version: 18.2.8
-      '@types/react-dom':
-        specifier: ^18.2.4
-        version: 18.2.4
       eslint:
         specifier: ^8.40.0
         version: 8.40.0

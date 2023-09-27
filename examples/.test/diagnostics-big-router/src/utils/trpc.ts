@@ -1,5 +1,4 @@
-import { httpBatchLink } from '@trpc/client';
-import { createTRPCNext } from '@trpc/next';
+import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
 // https://github.com/microsoft/TypeScript/issues/42873
 import '@trpc/react-query';
 import type { AppRouter } from '~/server/routers/_app';
@@ -20,15 +19,10 @@ function getBaseUrl() {
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
-export const trpc = createTRPCNext<AppRouter>({
-  config() {
-    return {
-      links: [
-        httpBatchLink({
-          url: getBaseUrl() + '/api/trpc',
-        }),
-      ],
-    };
-  },
-  ssr: true,
+export const trpc = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: getBaseUrl() + '/api/trpc',
+    }),
+  ],
 });
