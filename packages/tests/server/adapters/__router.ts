@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from '@trpc/server';
-import { TRPCRequestInfo } from '@trpc/server/http';
+import type { TRPCRequestInfo } from '@trpc/server/http';
 import { z } from 'zod';
 
 export type Context = {
@@ -23,6 +23,9 @@ export const router = t.router({
     .query(({ input, ctx }) => ({
       text: `hello ${input?.who ?? ctx.user?.name ?? 'world'}`,
     })),
+  helloMutation: t.procedure
+    .input(z.string())
+    .mutation(({ input }) => `hello ${input}`),
   request: t.router({
     info: t.procedure.query(({ ctx }) => {
       return ctx.info;

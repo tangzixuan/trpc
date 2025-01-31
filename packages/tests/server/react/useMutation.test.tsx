@@ -1,7 +1,7 @@
 import { getServerAndReactClient } from './__reactHelpers';
 import { render, waitFor } from '@testing-library/react';
-import { inferReactQueryProcedureOptions } from '@trpc/react-query';
-import { initTRPC } from '@trpc/server/src';
+import type { inferReactQueryProcedureOptions } from '@trpc/react-query';
+import { initTRPC } from '@trpc/server';
 import { konn } from 'konn';
 import React, { useEffect } from 'react';
 import { z } from 'zod';
@@ -27,7 +27,7 @@ const ctx = konn()
               text: z.string(),
             }),
           )
-          .mutation(() => `__mutationResult` as const),
+          .mutation(() => '__mutationResult' as const),
         createWithSerializable: t.procedure
           .input(
             z.object({
@@ -50,9 +50,9 @@ const ctx = konn()
   .done();
 
 test('useMutation', async () => {
-  const { App, proxy } = ctx;
+  const { App, client } = ctx;
   function MyComponent() {
-    const mutation = proxy.post.create.useMutation();
+    const mutation = client.post.create.useMutation();
 
     expect(mutation.trpc.path).toBe('post.create');
 
@@ -83,7 +83,7 @@ test('useMutation', async () => {
 });
 
 test('useMutation options inference', () => {
-  const { appRouter, proxy, App } = ctx;
+  const { appRouter, client, App } = ctx;
 
   type ReactQueryProcedure = inferReactQueryProcedureOptions<typeof appRouter>;
   type Options = ReactQueryProcedure['post']['createWithSerializable'];
@@ -94,7 +94,7 @@ test('useMutation options inference', () => {
 
   function MyComponent() {
     const options: Options = {};
-    proxy.post.createWithSerializable.useMutation({
+    client.post.createWithSerializable.useMutation({
       ...options,
       onSuccess: (data) => {
         expectTypeOf(data).toMatchTypeOf<{
