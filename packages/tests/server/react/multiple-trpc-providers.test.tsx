@@ -2,8 +2,9 @@ import { routerToServerAndClientNew } from '../___testHelpers';
 import { createQueryClient } from '../__queryClient';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
-import { createTRPCReact } from '@trpc/react-query/src';
-import { initTRPC } from '@trpc/server/src';
+import { getUntypedClient } from '@trpc/client';
+import { createTRPCReact } from '@trpc/react-query';
+import { initTRPC } from '@trpc/server';
 import { konn } from 'konn';
 import React, { createContext } from 'react';
 
@@ -76,13 +77,19 @@ test('multiple trpcProviders', async () => {
   }
   function App() {
     return (
-      <A.trpc.Provider queryClient={A.queryClient} client={ctx.A.client}>
+      <A.trpc.Provider
+        queryClient={A.queryClient}
+        client={getUntypedClient(ctx.A.client)}
+      >
         <QueryClientProvider client={A.queryClient}>
-          <B.trpc.Provider queryClient={B.queryClient} client={ctx.B.client}>
+          <B.trpc.Provider
+            queryClient={B.queryClient}
+            client={getUntypedClient(ctx.B.client)}
+          >
             <QueryClientProvider client={B.queryClient}>
               <C.trpc.Provider
                 queryClient={C.queryClient}
-                client={ctx.C.client}
+                client={getUntypedClient(ctx.C.client)}
               >
                 <QueryClientProvider client={C.queryClient}>
                   <MyComponent />

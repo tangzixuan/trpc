@@ -1,4 +1,3 @@
-import './___packages';
 import { initTRPC } from '@trpc/server';
 
 // FIXME: should we deprecate this?
@@ -15,6 +14,7 @@ test('call proc directly', async () => {
     path: 'asd',
     type: 'query',
     getRawInput: async () => ({}),
+    signal: undefined,
   });
 
   expect(result).toBe('hello');

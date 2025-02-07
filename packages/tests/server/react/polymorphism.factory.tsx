@@ -2,12 +2,15 @@
 // This file contains a useful pattern in tRPC,
 //  building factories which can produce common functionality over a homologous data source.
 //
-import { RouterLike, UtilsLike } from '@trpc/react-query/shared';
-import { AnyRootConfig, TRPCError } from '@trpc/server';
-import { createBuilder } from '@trpc/server/core/internals/procedureBuilder';
-import { createRouterFactory } from '@trpc/server/core/router';
+import type { RouterLike, UtilsLike } from '@trpc/react-query/shared';
+import { TRPCError } from '@trpc/server';
+import type {
+  AnyRootTypes,
+  createBuilder,
+} from '@trpc/server/unstable-core-do-not-import';
 import z from 'zod';
-import { Config, t } from './polymorphism.common';
+import type { $RootTypes } from './polymorphism.common';
+import { t } from './polymorphism.common';
 
 //
 // DTOs
@@ -30,8 +33,8 @@ export type FileExportStatusType = z.infer<typeof FileExportStatus>;
 // Dependencies
 //
 
-type BaseProcedure<TConfig extends AnyRootConfig> = ReturnType<
-  typeof createBuilder<TConfig>
+type BaseProcedure<TRoot extends AnyRootTypes> = ReturnType<
+  typeof createBuilder<TRoot['ctx'], TRoot['meta']>
 >;
 
 export type DataProvider = FileExportStatusType[];
@@ -43,10 +46,9 @@ export type DataProvider = FileExportStatusType[];
 
 let COUNTER = 1;
 
-export function createExportRoute<TBaseProcedure extends BaseProcedure<Config>>(
-  baseProcedure: TBaseProcedure,
-  dataProvider: DataProvider,
-) {
+export function createExportRoute<
+  TBaseProcedure extends BaseProcedure<$RootTypes>,
+>(baseProcedure: TBaseProcedure, dataProvider: DataProvider) {
   return t.router({
     start: baseProcedure
       .input(FileExportRequest)

@@ -1,8 +1,8 @@
 import { getServerAndReactClient } from './__reactHelpers';
-import { InfiniteData } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import { render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { initTRPC } from '@trpc/server/src';
+import { initTRPC } from '@trpc/server';
 import { konn } from 'konn';
 import React, { Suspense } from 'react';
 import { z } from 'zod';
@@ -40,9 +40,9 @@ const ctx = konn()
   .done();
 
 test('useSuspenseInfiniteQuery()', async () => {
-  const { App, proxy } = ctx;
+  const { App, client } = ctx;
   function MyComponent() {
-    const [data, query1] = proxy.post.list.useSuspenseInfiniteQuery(
+    const [data, query1] = client.post.list.useSuspenseInfiniteQuery(
       {},
       {
         getNextPageParam(lastPage) {
@@ -61,7 +61,7 @@ test('useSuspenseInfiniteQuery()', async () => {
           items: typeof fixtureData;
           next?: number | undefined;
         },
-        number | null
+        number | undefined
       >
     >(query1.data);
 
@@ -71,7 +71,7 @@ test('useSuspenseInfiniteQuery()', async () => {
           items: typeof fixtureData;
           next?: number | undefined;
         },
-        number | null
+        number | undefined
       >
     >(data);
 

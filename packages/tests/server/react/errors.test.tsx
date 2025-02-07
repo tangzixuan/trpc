@@ -1,8 +1,12 @@
 import { getServerAndReactClient } from './__reactHelpers';
 import { render, waitFor } from '@testing-library/react';
-import { TRPCClientError, TRPCClientErrorLike } from '@trpc/client/src';
-import { initTRPC, Maybe } from '@trpc/server';
-import { DefaultErrorData } from '@trpc/server/error/formatter';
+import type { TRPCClientErrorLike } from '@trpc/client';
+import { TRPCClientError } from '@trpc/client';
+import { initTRPC } from '@trpc/server';
+import type {
+  DefaultErrorData,
+  Maybe,
+} from '@trpc/server/unstable-core-do-not-import';
 import { konn } from 'konn';
 import React from 'react';
 import { z, ZodError } from 'zod';
@@ -45,10 +49,10 @@ describe('custom error formatter', () => {
     .done();
 
   test('query that fails', async () => {
-    const { proxy, App, appRouter } = ctx;
+    const { client, App, appRouter } = ctx;
     const queryErrorCallback = vi.fn();
     function MyComponent() {
-      const query1 = proxy.post.byId.useQuery({
+      const query1 = client.post.byId.useQuery({
         id: 0,
       });
 
@@ -129,10 +133,10 @@ describe('no custom formatter', () => {
     .done();
 
   test('query that fails', async () => {
-    const { proxy, App, appRouter } = ctx;
+    const { client, App, appRouter } = ctx;
     const queryErrorCallback = vi.fn();
     function MyComponent() {
-      const query1 = proxy.post.byId.useQuery({
+      const query1 = client.post.byId.useQuery({
         id: 0,
       });
 

@@ -1,9 +1,9 @@
 import { routerToServerAndClientNew } from './___testHelpers';
-import { wrap } from '@decs/typeschema';
-import { initTRPC } from '@trpc/server/src';
+import { initTRPC } from '@trpc/server';
 import myzod from 'myzod';
 import * as t from 'superstruct';
-import * as v from 'valibot';
+import * as v0 from 'valibot0';
+import * as v1 from 'valibot1';
 import * as yup from 'yup';
 import { z } from 'zod';
 
@@ -17,13 +17,14 @@ test('zod', async () => {
           input: z.string(),
         }),
       )
-      .query(({ input }) => {
-        return { input: input as string };
+      // @ts-expect-error mismatch between input and output
+      .query((opts) => {
+        return { input: opts.input };
       }),
   });
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -31,7 +32,7 @@ test('zod', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -55,9 +56,9 @@ test('zod async', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -65,7 +66,7 @@ test('zod async', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -87,9 +88,9 @@ test('zod transform', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeNumber();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -97,26 +98,26 @@ test('zod transform', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
   await close();
 });
 
-test('valibot', async () => {
+test('valibot v0', async () => {
   const trpc = initTRPC.create();
   const router = trpc.router({
     q: trpc.procedure
-      .input(wrap(v.union([v.string(), v.number()])))
-      .output(wrap(v.object({ input: v.string() })))
+      .input(v0.parser(v0.union([v0.string(), v0.number()])))
+      .output(v0.parser(v0.object({ input: v0.string() })))
       .query(({ input }) => {
         return { input: input as string };
       }),
   });
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -124,23 +125,24 @@ test('valibot', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
   await close();
 });
 
-test('valibot async', async () => {
+test('valibot v0 async', async () => {
   const trpc = initTRPC.create();
   const router = trpc.router({
     q: trpc.procedure
-      .input(wrap(v.unionAsync([v.stringAsync(), v.numberAsync()])))
+      .input(v0.parserAsync(v0.unionAsync([v0.string(), v0.number()])))
       .output(
-        wrap(
-          v.objectAsync({ input: v.stringAsync() }, [
-            v.customAsync(async (value) => !!value),
-          ]),
+        v0.parserAsync(
+          v0.pipeAsync(
+            v0.objectAsync({ input: v0.string() }),
+            v0.checkAsync(async (value) => !!value),
+          ),
         ),
       )
       .query(({ input }) => {
@@ -148,9 +150,9 @@ test('valibot async', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -158,22 +160,25 @@ test('valibot async', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
   await close();
 });
 
-test('valibot transform', async () => {
+test('valibot v0 transform', async () => {
   const trpc = initTRPC.create();
   const router = trpc.router({
     q: trpc.procedure
-      .input(wrap(v.union([v.string(), v.number()])))
+      .input(v0.parser(v0.union([v0.string(), v0.number()])))
       .output(
-        wrap(
-          v.object({
-            input: v.transform(v.string(), (s) => s.length),
+        v0.parser(
+          v0.object({
+            input: v0.pipe(
+              v0.string(),
+              v0.transform((s) => s.length),
+            ),
           }),
         ),
       )
@@ -182,9 +187,9 @@ test('valibot transform', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeNumber();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -192,7 +197,104 @@ test('valibot transform', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
+    `[TRPCClientError: Output validation failed]`,
+  );
+
+  await close();
+});
+
+test('valibot v1', async () => {
+  const trpc = initTRPC.create();
+  const router = trpc.router({
+    q: trpc.procedure
+      .input(v1.union([v1.string(), v1.number()]))
+      .output(v1.object({ input: v1.string() }))
+      .query(({ input }) => {
+        return { input: input as string };
+      }),
+  });
+  const { client, close } = routerToServerAndClientNew(router);
+
+  const output = await client.q.query('foobar');
+  expectTypeOf(output.input).toBeString();
+  expect(output).toMatchInlineSnapshot(`
+    Object {
+      "input": "foobar",
+    }
+  `);
+
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
+    `[TRPCClientError: Output validation failed]`,
+  );
+
+  await close();
+});
+
+test('valibot v1 async', async () => {
+  const trpc = initTRPC.create();
+  const router = trpc.router({
+    q: trpc.procedure
+      .input(v1.parserAsync(v1.unionAsync([v1.string(), v1.number()])))
+      .output(
+        v1.parserAsync(
+          v1.pipeAsync(
+            v1.objectAsync({ input: v1.string() }),
+            v1.checkAsync(async (value) => !!value),
+          ),
+        ),
+      )
+      .query(({ input }) => {
+        return { input: input as string };
+      }),
+  });
+
+  const { client, close } = routerToServerAndClientNew(router);
+
+  const output = await client.q.query('foobar');
+  expectTypeOf(output.input).toBeString();
+  expect(output).toMatchInlineSnapshot(`
+    Object {
+      "input": "foobar",
+    }
+  `);
+
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
+    `[TRPCClientError: Output validation failed]`,
+  );
+
+  await close();
+});
+
+test('valibot v1 transform', async () => {
+  const trpc = initTRPC.create();
+  const router = trpc.router({
+    q: trpc.procedure
+      .input(v1.union([v1.string(), v1.number()]))
+      .output(
+        v1.object({
+          input: v1.pipe(
+            v1.string(),
+            v1.transform((s) => s.length),
+          ),
+        }),
+      )
+      .query(({ input }) => {
+        return { input: input as string };
+      }),
+  });
+
+  const { client, close } = routerToServerAndClientNew(router);
+
+  const output = await client.q.query('foobar');
+  expectTypeOf(output.input).toBeNumber();
+  expect(output).toMatchInlineSnapshot(`
+    Object {
+      "input": 6,
+    }
+  `);
+
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -214,9 +316,9 @@ test('superstruct', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -224,7 +326,7 @@ test('superstruct', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -238,6 +340,24 @@ test('yup', async () => {
         return yup.number().required();
       case 'string':
         return yup.string().required();
+      case 'bigint': {
+        throw new Error('Not implemented yet: "bigint" case');
+      }
+      case 'boolean': {
+        throw new Error('Not implemented yet: "boolean" case');
+      }
+      case 'symbol': {
+        throw new Error('Not implemented yet: "symbol" case');
+      }
+      case 'undefined': {
+        throw new Error('Not implemented yet: "undefined" case');
+      }
+      case 'object': {
+        throw new Error('Not implemented yet: "object" case');
+      }
+      case 'function': {
+        throw new Error('Not implemented yet: "function" case');
+      }
       default:
         throw new Error('Fail');
     }
@@ -257,9 +377,9 @@ test('yup', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -267,7 +387,7 @@ test('yup', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -289,9 +409,9 @@ test('myzod', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -299,7 +419,7 @@ test('myzod', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -322,9 +442,9 @@ test('validator fn', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -332,7 +452,7 @@ test('validator fn', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 
@@ -355,9 +475,9 @@ test('async validator fn', async () => {
       }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router);
+  const { client, close } = routerToServerAndClientNew(router);
 
-  const output = await proxy.q.query('foobar');
+  const output = await client.q.query('foobar');
   expectTypeOf(output.input).toBeString();
   expect(output).toMatchInlineSnapshot(`
     Object {
@@ -365,7 +485,7 @@ test('async validator fn', async () => {
     }
   `);
 
-  await expect(proxy.q.query(1234)).rejects.toMatchInlineSnapshot(
+  await expect(client.q.query(1234)).rejects.toMatchInlineSnapshot(
     `[TRPCClientError: Output validation failed]`,
   );
 

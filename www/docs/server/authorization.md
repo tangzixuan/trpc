@@ -10,8 +10,6 @@ The `createContext` function is called for each incoming request, so here you ca
 ## Create context from request headers
 
 ```ts title='server/context.ts'
-import * as trpc from '@trpc/server';
-import { inferAsyncReturnType } from '@trpc/server';
 import * as trpcNext from '@trpc/server/adapters/next';
 import { decodeAndVerifyJwtToken } from './somewhere/in/your/app/utils';
 
@@ -38,7 +36,7 @@ export async function createContext({
     user,
   };
 }
-export type Context = inferAsyncReturnType<typeof createContext>;
+export type Context = Awaited<ReturnType<typeof createContext>>;
 ```
 
 ## Option 1: Authorize using resolver
@@ -70,23 +68,29 @@ const appRouter = t.router({
 
 ```ts title='server/routers/_app.ts'
 import { initTRPC, TRPCError } from '@trpc/server';
+import type { Context } from '../context';
 
 export const t = initTRPC.context<Context>().create();
 
-const isAuthed = t.middleware((opts) => {
-  const { ctx } = opts;
-  if (!ctx.user?.isAdmin) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' });
-  }
-  return opts.next({
-    ctx: {
-      user: ctx.user,
-    },
-  });
-});
-
 // you can reuse this for any procedure
-export const protectedProcedure = t.procedure.use(isAuthed);
+export const protectedProcedure = t.procedure.use(
+  async function isAuthed(opts) {
+    const { ctx } = opts;
+    // `ctx.user` is nullable
+    if (!ctx.user) {
+      //     ^?
+      throw new TRPCError({ code: 'UNAUTHORIZED' });
+    }
+
+    return opts.next({
+      ctx: {
+        // ✅ user value is known to be non-null now
+        user: ctx.user,
+        // ^?
+      },
+    });
+  },
+);
 
 t.router({
   // this is accessible for everyone
