@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-var-requires */
 import type { Config } from 'tailwindcss';
 import plugin from 'tailwindcss/plugin';
 
@@ -6,6 +5,7 @@ const config: Config = {
   content: [
     './src/**/*.{js,jsx,ts,tsx,md,mdx}',
     './docs/**/*.{js,jsx,ts,tsx,md,mdx}',
+    './blog/**/*.{js,jsx,ts,tsx,md,mdx}',
   ],
   theme: {
     extend: {
@@ -37,10 +37,15 @@ const config: Config = {
             transform: 'translateY(-1rem)',
           },
         },
+        'infinite-scroll': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-100%)' },
+        },
       },
       animation: {
         'pop-in': 'pop-in 1s ease-out',
         loader: 'loader 0.6s infinite alternate',
+        'infinite-scroll': 'infinite-scroll 25s linear infinite',
       },
     },
   },

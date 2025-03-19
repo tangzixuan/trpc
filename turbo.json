@@ -1,29 +1,23 @@
 {
   "$schema": "https://turborepo.org/schema.json",
   "globalDependencies": [
-    ".eslintrc.js",
+    ".eslintrc.config.js",
     "tsconfig.json",
-    "scripts/entrypoints.ts",
-    "scripts/getRollupConfig.ts"
+    "tsconfig.build.json",
+    "scripts/**"
   ],
-  "pipeline": {
-    "codegen-entrypoints": {
-      "outputs": [
-        "app-dir/**",
-        "links/**",
-        "shared/**",
-        "server/**",
-        "ssg/**",
-        "adapters/**",
-        "http/**",
-        "observable/**",
-        "rpc/**",
-        "subscription/**",
-        "package.json"
-      ]
-    },
+  "globalEnv": [
+    "CI",
+    "NODE_ENV",
+    "DATABASE_URL",
+    "NEXTAUTH_SECRET",
+    "AUTH_GITHUB_ID",
+    "AUTH_GITHUB_SECRET"
+  ],
+  "tasks": {
+    "codegen-entrypoints": {},
     "codegen-tests": {
-      "outputs": ["server/__generated__/bigBoi/**"]
+      "outputs": ["*/__generated__/bigBoi/**"]
     },
     "prebuild": {
       "cache": false
@@ -39,7 +33,7 @@
         "docs/typedoc/**"
       ]
     },
-    "@examples/minimal-react#build": {
+    "examples-minimal-react#build": {
       "outputs": ["client/dist/**", "server/dist/**"]
     },
     "dev": {
@@ -59,6 +53,10 @@
       "cache": false
     },
     "test-ci": {
+      "dependsOn": ["^build", "codegen-tests"],
+      "cache": false
+    },
+    "test-run:tsc": {
       "dependsOn": ["^build", "codegen-tests"],
       "cache": false
     },

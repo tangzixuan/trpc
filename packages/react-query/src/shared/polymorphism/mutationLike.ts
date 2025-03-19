@@ -1,6 +1,10 @@
-import { AnyProcedure, AnyRootConfig, inferProcedureInput } from '@trpc/server';
-import { inferTransformedProcedureOutput } from '@trpc/server/shared';
-import {
+import type {
+  AnyProcedure,
+  AnyRootTypes,
+  inferProcedureInput,
+  inferTransformedProcedureOutput,
+} from '@trpc/server/unstable-core-do-not-import';
+import type {
   InferMutationOptions,
   InferMutationResult,
 } from '../../utils/inferReactQueryProcedure';
@@ -9,18 +13,20 @@ import {
  * Use to describe a mutation route which matches a given mutation procedure's interface
  */
 export type MutationLike<
-  TConfig extends AnyRootConfig = AnyRootConfig,
-  TProcedure extends AnyProcedure = AnyProcedure,
+  TRoot extends AnyRootTypes,
+  TProcedure extends AnyProcedure,
 > = {
   useMutation: (
-    opts?: InferMutationOptions<TConfig, TProcedure>,
-  ) => InferMutationResult<TConfig, TProcedure>;
+    opts?: InferMutationOptions<TRoot, TProcedure>,
+  ) => InferMutationResult<TRoot, TProcedure>;
 };
 
 /**
  * Use to unwrap a MutationLike's input
  */
-export type InferMutationLikeInput<TMutationLike extends MutationLike> =
+export type InferMutationLikeInput<
+  TMutationLike extends MutationLike<any, any>,
+> =
   TMutationLike extends MutationLike<any, infer $Procedure>
     ? inferProcedureInput<$Procedure>
     : never;
@@ -28,7 +34,9 @@ export type InferMutationLikeInput<TMutationLike extends MutationLike> =
 /**
  * Use to unwrap a MutationLike's data output
  */
-export type InferMutationLikeData<TMutationLike extends MutationLike> =
-  TMutationLike extends MutationLike<infer TConfig, infer TProcedure>
-    ? inferTransformedProcedureOutput<TConfig, TProcedure>
+export type InferMutationLikeData<
+  TMutationLike extends MutationLike<any, any>,
+> =
+  TMutationLike extends MutationLike<infer TRoot, infer TProcedure>
+    ? inferTransformedProcedureOutput<TRoot, TProcedure>
     : never;

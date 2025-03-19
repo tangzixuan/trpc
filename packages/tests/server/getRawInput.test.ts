@@ -1,6 +1,6 @@
-import { initTRPC, TRPCError } from '@trpc/server';
-import './___packages';
-import { waitError } from './___testHelpers';
+import { waitError } from '@trpc/server/__tests__/waitError';
+import type { TRPCError } from '@trpc/server';
+import { initTRPC } from '@trpc/server';
 
 test('middleware swap', async () => {
   const t = initTRPC.create();
@@ -46,6 +46,7 @@ test('untyped caller', async () => {
     path: 'test',
     type: 'query',
     input: 'foo',
+    signal: undefined,
   });
   expect(result).toBe('foo');
 });
@@ -70,6 +71,7 @@ test('getRawInput fails', async () => {
       path: 'test',
       type: 'query',
       input: 'foo',
+      signal: undefined,
     }),
   );
 

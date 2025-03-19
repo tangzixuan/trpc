@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 // Don't judge me on this code
 import fs from 'fs';
 import { allSponsors } from './script.output';
@@ -18,21 +19,19 @@ const sections: Def = {
   diamond: [],
   gold: [
     //
-    'calcom',
-    'tolahq',
+    'tryretool',
   ],
   silver: [
     //
-    'JasonDocton',
-    'flightcontrolhq',
+    'calcom',
+    'coderabbitai',
+    'greptileai',
   ],
   bronze: [
     //
     'hidrb',
-    'snaplet',
-    'flylance-apps',
-    'echobind',
-    'interval',
+    'ryanmagoon',
+    'jonluca',
   ],
 };
 
@@ -57,12 +56,12 @@ for (const sponsor of sponsors) {
   const section = sections.diamond.includes(login)
     ? 'diamond'
     : sections.gold.includes(login)
-    ? 'gold'
-    : sections.silver.includes(login)
-    ? 'silver'
-    : sections.bronze.includes(login)
-    ? 'bronze'
-    : 'other';
+      ? 'gold'
+      : sections.silver.includes(login)
+        ? 'silver'
+        : sections.bronze.includes(login)
+          ? 'bronze'
+          : 'other';
 
   buckets[section].push(sponsor);
 }
@@ -112,21 +111,23 @@ for (const [k, config] of Object.entries(bucketConfig)) {
   }
   markdown.push(`### ${config.title}`);
 
-  const cols = buckets[key].map(
-    (sponsor) =>
-      `<td align="center"><a href="${encodeURI(
-        sponsor.link,
-      )}"><img src="${encodeURI(sponsor.imgSrc)}&s=${config.imgSize}" width="${
-        config.imgSize
-      }" alt="${encodeURI(sponsor.name)}"/><br />${sponsor.name}</a></td>`,
-  );
+  const cols = buckets[key].map((sponsor) => {
+    const imgSrc = new URL(sponsor.imgSrc);
+    imgSrc.searchParams.set('s', config.imgSize.toString());
+
+    return `<td align="center"><a href="${encodeURI(
+      sponsor.link,
+    )}"><img src="${encodeURI(imgSrc.toString())}" width="${
+      config.imgSize
+    }" alt="${encodeURI(sponsor.name)}"/><br />${sponsor.name}</a></td>`;
+  });
 
   const rowsMatrix: string[][] = [[]];
   for (const col of cols) {
-    if (rowsMatrix[rowsMatrix.length - 1].length >= config.numCols) {
+    if (rowsMatrix[rowsMatrix.length - 1]!.length >= config.numCols) {
       rowsMatrix.push([]);
     }
-    rowsMatrix[rowsMatrix.length - 1].push(col);
+    rowsMatrix[rowsMatrix.length - 1]!.push(col);
   }
 
   let table = '<table>';

@@ -21,7 +21,6 @@ import { initTRPC } from '@trpc/server';
 const t = initTRPC.create();
 
 export const router = t.router;
-export const middleware = t.middleware;
 export const publicProcedure = t.procedure;
 ```
 
@@ -38,14 +37,12 @@ In order for these endpoints to be exposed to the frontend, your [Adapter](/docs
 import { initTRPC } from '@trpc/server';
 const t = initTRPC.create();
 
-
-export const middleware = t.middleware;
 export const publicProcedure = t.procedure;
 export const router = t.router;
 
 // @filename: _app.ts
-// ---cut---
 import * as trpc from '@trpc/server';
+// ---cut---
 import { publicProcedure, router } from './trpc';
 
 const appRouter = router({
@@ -78,16 +75,16 @@ const t = initTRPC.context<Context>().meta<Meta>().create({
 ### Runtime Configuration
 
 ```ts
-export interface RuntimeConfig<TTypes extends RootConfigTypes> {
+export interface RootConfig<TTypes extends RootTypes> {
   /**
    * Use a data transformer
-   * @link https://trpc.io/docs/data-transformers
+   * @see https://trpc.io/docs/v11/data-transformers
    */
   transformer: TTypes['transformer'];
 
   /**
    * Use custom error formatting
-   * @link https://trpc.io/docs/error-formatting
+   * @see https://trpc.io/docs/v11/error-formatting
    */
   errorFormatter: ErrorFormatter<TTypes['ctx'], any>;
 

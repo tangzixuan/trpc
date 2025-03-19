@@ -1,19 +1,19 @@
-import { routerToServerAndClientNew, waitError } from './___testHelpers';
+import { testServerAndClientResource } from '@trpc/client/__tests__/testClientResource';
+import { waitError } from '@trpc/server/__tests__/waitError';
 import {
-  createTRPCProxyClient,
+  createTRPCClient,
   createWSClient,
   httpBatchLink,
   httpLink,
   TRPCClientError,
   wsLink,
 } from '@trpc/client';
-import {
+import { initTRPC, TRPCError } from '@trpc/server';
+import { observable } from '@trpc/server/observable';
+import type {
   CombinedDataTransformer,
   DataTransformer,
-  initTRPC,
-  TRPCError,
-} from '@trpc/server';
-import { observable } from '@trpc/server/src/observable';
+} from '@trpc/server/unstable-core-do-not-import';
 import { uneval } from 'devalue';
 import superjson from 'superjson';
 import { createTson, tsonDate } from 'tupleson';
@@ -33,20 +33,17 @@ test('superjson up and down', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
-    client({ httpUrl }) {
+  await using ctx = testServerAndClientResource(router, {
+    client({ httpUrl, transformer }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
 
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });
 
 test('empty superjson up and down', async () => {
@@ -59,20 +56,17 @@ test('empty superjson up and down', async () => {
     emptyDown: t.procedure.input(z.string()).query(() => 'hello world'),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const res1 = await proxy.emptyUp.query();
+  const res1 = await ctx.client.emptyUp.query();
   expect(res1).toBe('hello world');
-  const res2 = await proxy.emptyDown.query('');
+  const res2 = await ctx.client.emptyDown.query('');
   expect(res2).toBe('hello world');
-
-  await close();
 });
 
 test('wsLink: empty superjson up and down', async () => {
@@ -86,22 +80,18 @@ test('wsLink: empty superjson up and down', async () => {
     emptyDown: t.procedure.input(z.string()).query(() => 'hello world'),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ wssUrl }) {
       ws = createWSClient({ url: wssUrl });
       return {
-        transformer,
-        links: [wsLink({ client: ws })],
+        links: [wsLink({ client: ws, transformer })],
       };
     },
   });
-  const res1 = await proxy.emptyUp.query();
+  const res1 = await ctx.client.emptyUp.query();
   expect(res1).toBe('hello world');
-  const res2 = await proxy.emptyDown.query('');
+  const res2 = await ctx.client.emptyDown.query('');
   expect(res2).toBe('hello world');
-
-  await close();
-  ws.close();
 });
 
 test('devalue up and down', async () => {
@@ -121,19 +111,16 @@ test('devalue up and down', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });
 
 test('not batching: superjson up and devalue down', async () => {
@@ -156,19 +143,16 @@ test('not batching: superjson up and devalue down', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpLink({ url: httpUrl })],
+        links: [httpLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });
 
 test('batching: superjson up and devalue down', async () => {
@@ -191,19 +175,16 @@ test('batching: superjson up and devalue down', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });
 
 test('batching: superjson up and f down', async () => {
@@ -226,17 +207,14 @@ test('batching: superjson up and f down', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client: ({ httpUrl }) => ({
-      transformer,
-      links: [httpBatchLink({ url: httpUrl })],
+      links: [httpBatchLink({ url: httpUrl, transformer })],
     }),
   });
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });
 
 test('all transformers running in correct order', async () => {
@@ -275,23 +253,20 @@ test('all transformers running in correct order', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const res = await proxy.hello.query(world);
+  const res = await ctx.client.hello.query(world);
   expect(res).toBe(world);
-  expect(fn.mock.calls[0]![0]!).toBe('client:serialized');
-  expect(fn.mock.calls[1]![0]!).toBe('server:deserialized');
-  expect(fn.mock.calls[2]![0]!).toBe(world);
-  expect(fn.mock.calls[3]![0]!).toBe('server:serialized');
-  expect(fn.mock.calls[4]![0]!).toBe('client:deserialized');
-
-  await close();
+  expect(fn.mock.calls[0]![0]).toBe('client:serialized');
+  expect(fn.mock.calls[1]![0]).toBe('server:deserialized');
+  expect(fn.mock.calls[2]![0]).toBe(world);
+  expect(fn.mock.calls[3]![0]).toBe('server:serialized');
+  expect(fn.mock.calls[4]![0]).toBe('client:deserialized');
 });
 
 describe('transformer on router', () => {
@@ -309,19 +284,16 @@ describe('transformer on router', () => {
       }),
     });
 
-    const { close, proxy } = routerToServerAndClientNew(router, {
+    await using ctx = testServerAndClientResource(router, {
       client({ httpUrl }) {
         return {
-          transformer,
-          links: [httpBatchLink({ url: httpUrl })],
+          links: [httpBatchLink({ url: httpUrl, transformer })],
         };
       },
     });
-    const res = await proxy.hello.query(date);
+    const res = await ctx.client.hello.query(date);
     expect(res.getTime()).toBe(date.getTime());
     expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-    await close();
   });
 
   test('ws', async () => {
@@ -339,24 +311,22 @@ describe('transformer on router', () => {
       }),
     });
 
-    const { close, proxy } = routerToServerAndClientNew(router, {
+    await using ctx = testServerAndClientResource(router, {
       client({ wssUrl }) {
         wsClient = createWSClient({
           url: wssUrl,
         });
         return {
-          transformer,
-          links: [wsLink({ client: wsClient })],
+          links: [wsLink({ client: wsClient, transformer })],
         };
       },
     });
 
-    const res = await proxy.hello.query(date);
+    const res = await ctx.client.hello.query(date);
     expect(res.getTime()).toBe(date.getTime());
     expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
 
     wsClient.close();
-    await close();
   });
 
   test('subscription', async () => {
@@ -379,20 +349,19 @@ describe('transformer on router', () => {
       }),
     });
 
-    const { close, proxy } = routerToServerAndClientNew(router, {
+    await using ctx = testServerAndClientResource(router, {
       client({ wssUrl }) {
         wsClient = createWSClient({
           url: wssUrl,
         });
         return {
-          transformer,
-          links: [wsLink({ client: wsClient })],
+          links: [wsLink({ client: wsClient, transformer })],
         };
       },
     });
 
     const data = await new Promise<Date>((resolve) => {
-      const subscription = proxy.hello.subscribe(date, {
+      const subscription = ctx.client.hello.subscribe(date, {
         onData: (data) => {
           subscription.unsubscribe();
           resolve(data);
@@ -404,7 +373,6 @@ describe('transformer on router', () => {
     expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
 
     wsClient.close();
-    await close();
   });
 
   test('superjson up and devalue down: transform errors correctly', async () => {
@@ -432,18 +400,20 @@ describe('transformer on router', () => {
       }),
     });
 
-    const { close, proxy } = routerToServerAndClientNew(router, {
+    await using ctx = testServerAndClientResource(router, {
       server: {
         onError,
       },
       client({ httpUrl }) {
         return {
-          transformer,
-          links: [httpBatchLink({ url: httpUrl })],
+          links: [httpBatchLink({ url: httpUrl, transformer })],
         };
       },
     });
-    const clientError = await waitError(proxy.err.query(), TRPCClientError);
+    const clientError = await waitError(
+      ctx.client.err.query(),
+      TRPCClientError,
+    );
     expect(clientError.shape.message).toMatchInlineSnapshot(`"woop"`);
     expect(clientError.shape.code).toMatchInlineSnapshot(`-32603`);
 
@@ -455,8 +425,6 @@ describe('transformer on router', () => {
       throw new Error('Wrong error');
     }
     expect(serverError.cause).toBeInstanceOf(MyError);
-
-    await close();
   });
 });
 
@@ -473,15 +441,14 @@ test('superjson - no input', async () => {
     }),
   });
 
-  const { close, httpUrl } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
-  const json = await (await fetch(`${httpUrl}/hello`)).json();
+  const json = await (await fetch(`${ctx.httpUrl}/hello`)).json();
 
   expect(json).not.toHaveProperty('error');
   expect(json).toMatchInlineSnapshot(`
@@ -493,8 +460,6 @@ Object {
   },
 }
 `);
-
-  await close();
 });
 
 describe('required transformers', () => {
@@ -502,7 +467,7 @@ describe('required transformers', () => {
     const t = initTRPC.create({});
     const router = t.router({});
 
-    createTRPCProxyClient<typeof router>({
+    createTRPCClient<typeof router>({
       links: [httpBatchLink({ url: '' })],
     });
   });
@@ -514,9 +479,8 @@ describe('required transformers', () => {
     });
     const router = t.router({});
 
-    createTRPCProxyClient<typeof router>({
-      links: [httpBatchLink({ url: '' })],
-      transformer,
+    createTRPCClient<typeof router>({
+      links: [httpBatchLink({ url: '', transformer })],
     });
   });
 
@@ -526,19 +490,25 @@ describe('required transformers', () => {
       transformer,
     });
     const router = t.router({});
+    type Test = typeof t._config.$types.transformer;
 
-    // @ts-expect-error missing transformer on frontend
-    createTRPCProxyClient<typeof router>({
-      links: [httpBatchLink({ url: '' })],
+    createTRPCClient<typeof router>({
+      links: [
+        httpBatchLink(
+          // @ts-expect-error missing transformer on frontend
+          { url: '' },
+        ),
+      ],
     });
   });
 
   test('errors with transformer set on frontend but not on backend', () => {
-    const transformer = superjson;
     const t = initTRPC.create({});
     const router = t.router({});
+    type Test = typeof t._config.$types.transformer;
 
-    createTRPCProxyClient<typeof router>({
+    const transformer = superjson;
+    createTRPCClient<typeof router>({
       links: [httpBatchLink({ url: '' })],
       // @ts-expect-error missing transformer on backend
       transformer,
@@ -563,18 +533,15 @@ test('tupleson', async () => {
     }),
   });
 
-  const { close, proxy } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client({ httpUrl }) {
       return {
-        transformer,
-        links: [httpBatchLink({ url: httpUrl })],
+        links: [httpBatchLink({ url: httpUrl, transformer })],
       };
     },
   });
 
-  const res = await proxy.hello.query(date);
+  const res = await ctx.client.hello.query(date);
   expect(res.getTime()).toBe(date.getTime());
   expect((fn.mock.calls[0]![0]! as Date).getTime()).toBe(date.getTime());
-
-  await close();
 });

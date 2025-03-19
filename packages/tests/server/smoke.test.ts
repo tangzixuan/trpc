@@ -1,9 +1,13 @@
 import { EventEmitter } from 'events';
-import { routerToServerAndClientNew, waitError } from './___testHelpers';
-import { waitFor } from '@testing-library/react';
-import { TRPCClientError, wsLink } from '@trpc/client/src';
-import { inferProcedureOutput, initTRPC } from '@trpc/server/src';
-import { observable, Unsubscribable } from '@trpc/server/src/observable';
+import { testServerAndClientResource } from '@trpc/client/__tests__/testClientResource';
+import { waitError } from '@trpc/server/__tests__/waitError';
+import '@testing-library/react';
+import { getUntypedClient, TRPCClientError, wsLink } from '@trpc/client';
+import type { inferProcedureOutput } from '@trpc/server';
+import { initTRPC } from '@trpc/server';
+import type { Unsubscribable } from '@trpc/server/observable';
+import { observable } from '@trpc/server/observable';
+import { lazy } from '@trpc/server/unstable-core-do-not-import';
 import { z } from 'zod';
 
 const t = initTRPC
@@ -27,14 +31,14 @@ test('untyped client - happy path w/o input', async () => {
   const router = t.router({
     hello: procedure.query(() => 'world'),
   });
+  await using ctx = testServerAndClientResource(router);
 
-  const { client, close } = routerToServerAndClientNew(router);
+  const untypedClient = getUntypedClient(ctx.client);
 
   // client is untyped
-  const res = await client.query('hello');
+  const res = await untypedClient.query('hello');
   expect(res).toBe('world');
   expectTypeOf(res).toBeUnknown();
-  await close();
 });
 
 test('untyped client - happy path with input', async () => {
@@ -43,18 +47,16 @@ test('untyped client - happy path with input', async () => {
       .input(z.string())
       .query(({ input }) => `hello ${input}`),
   });
-  const { client, close } = routerToServerAndClientNew(router);
+  await using ctx = testServerAndClientResource(router);
+  const untypedClient = getUntypedClient(ctx.client);
 
-  expect(await client.query('greeting', 'KATT')).toBe('hello KATT');
-  await close();
+  expect(await untypedClient.query('greeting', 'KATT')).toBe('hello KATT');
 });
 
-test('very happy path', async () => {
+test('very happy path - query', async () => {
   const greeting = t.procedure
     .input(z.string())
-    .use(({ next }) => {
-      return next();
-    })
+    .use(({ next }) => next())
     .query(({ input }) => `hello ${input}`);
   const router = t.router({
     greeting,
@@ -64,9 +66,75 @@ test('very happy path', async () => {
     type TContext = inferProcedureOutput<typeof greeting>;
     expectTypeOf<TContext>().toMatchTypeOf<string>();
   }
-  const { proxy, close } = routerToServerAndClientNew(router);
-  expect(await proxy.greeting.query('KATT')).toBe('hello KATT');
-  await close();
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.greeting.query('KATT')).toBe('hello KATT');
+});
+
+test('very happy path - mutation', async () => {
+  const greeting = t.procedure
+    .input(z.string())
+    .use(({ next }) => {
+      return next();
+    })
+    .mutation(({ input }) => `hello ${input}`);
+  const router = t.router({
+    greeting,
+  });
+
+  {
+    type TContext = inferProcedureOutput<typeof greeting>;
+    expectTypeOf<TContext>().toMatchTypeOf<string>();
+  }
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.greeting.mutate('KATT')).toBe('hello KATT');
+});
+
+test('nested short-hand routes', async () => {
+  const greeting = t.procedure
+    .input(z.string())
+    .use(({ next }) => {
+      return next();
+    })
+    .query(({ input }) => `hello ${input}`);
+  const router = t.router({
+    deeply: {
+      nested: {
+        greeting,
+      },
+    },
+  });
+
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.deeply.nested.greeting.query('KATT')).toBe(
+    'hello KATT',
+  );
+});
+
+test('mixing short-hand routes and routers', async () => {
+  const greeting = t.procedure
+    .input(z.string())
+    .use(({ next }) => {
+      return next();
+    })
+    .query(({ input }) => `hello ${input}`);
+  const router = t.router({
+    deeply: {
+      nested: {
+        greeting,
+        router: t.router({
+          greeting,
+        }),
+      },
+    },
+  });
+
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.deeply.nested.greeting.query('KATT')).toBe(
+    'hello KATT',
+  );
+  expect(await ctx.client.deeply.nested.router.greeting.query('KATT')).toBe(
+    'hello KATT',
+  );
 });
 
 test('middleware', async () => {
@@ -88,46 +156,46 @@ test('middleware', async () => {
       })
       .query(({ ctx }) => `${ctx.prefix} ${ctx.user}`),
   });
-  const { proxy, close } = routerToServerAndClientNew(router);
-  expect(await proxy.greeting.query()).toBe('hello KATT');
-  await close();
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.greeting.query()).toBe('hello KATT');
 });
 
 test('sad path', async () => {
   const router = t.router({
     hello: procedure.query(() => 'world'),
   });
-  const { proxy, close } = routerToServerAndClientNew(router);
+  await using ctx = testServerAndClientResource(router);
 
   // @ts-expect-error this procedure does not exist
-  const result = await waitError(proxy.not.found.query(), TRPCClientError);
+  const result = await waitError(ctx.client.not.found.query(), TRPCClientError);
   expect(result).toMatchInlineSnapshot(
-    `[TRPCClientError: No "query"-procedure on path "not.found"]`,
+    `[TRPCClientError: No procedure found on path "not.found"]`,
   );
-  await close();
 });
 
 test('call a mutation as a query', async () => {
   const router = t.router({
     hello: procedure.query(() => 'world'),
   });
-  const { proxy, close } = routerToServerAndClientNew(router);
+  await using ctx = testServerAndClientResource(router);
 
-  await expect((proxy.hello as any).mutate()).rejects.toMatchInlineSnapshot(
-    `[TRPCClientError: No "mutation"-procedure on path "hello"]`,
+  await expect(
+    (ctx.client.hello as any).mutate(),
+  ).rejects.toMatchInlineSnapshot(
+    `[TRPCClientError: Unsupported POST-request to query procedure at path "hello"]`,
   );
-
-  await close();
 });
 
 test('flat router', async () => {
   const hello = procedure.query(() => 'world');
   const bye = procedure.query(() => 'bye');
+  const child = t.router({
+    bye,
+  });
+
   const router1 = t.router({
     hello,
-    child: t.router({
-      bye,
-    }),
+    child,
   });
 
   expect(router1.hello).toBe(hello);
@@ -172,13 +240,13 @@ test('subscriptions', async () => {
     }),
   });
 
-  const { proxy, close } = routerToServerAndClientNew(router, {
+  await using ctx = testServerAndClientResource(router, {
     client: ({ wsClient }) => ({
       links: [wsLink({ client: wsClient })],
     }),
   });
 
-  const subscription = proxy.onEvent.subscribe(10, {
+  const subscription = ctx.client.onEvent.subscribe(10, {
     onStarted: onStartedMock,
     onData: (data) => {
       expectTypeOf(data).toMatchTypeOf<number>();
@@ -188,28 +256,39 @@ test('subscriptions', async () => {
   });
 
   expectTypeOf(subscription).toMatchTypeOf<Unsubscribable>();
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(onStartedMock).toBeCalledTimes(1);
   });
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(subscriptionMock).toBeCalledTimes(1);
   });
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(subscriptionMock).toHaveBeenNthCalledWith(1, 10);
   });
 
   ee.emit('data', 20);
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(onDataMock).toBeCalledTimes(1);
   });
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(onDataMock).toHaveBeenNthCalledWith(1, 30);
   });
 
   subscription.unsubscribe();
-  await waitFor(() => {
+  await vi.waitFor(() => {
     expect(onCompleteMock).toBeCalledTimes(1);
   });
+});
 
-  await close();
+test('lazy', async () => {
+  const router = t.router({
+    inSomeOtherFile: lazy(async () => {
+      return t.router({
+        hello: procedure.query(() => 'world'),
+      });
+    }),
+  });
+
+  await using ctx = testServerAndClientResource(router);
+  expect(await ctx.client.inSomeOtherFile.hello.query()).toBe('world');
 });

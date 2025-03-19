@@ -1,38 +1,39 @@
 import { EventEmitter } from 'events';
 import ws from '@fastify/websocket';
-import { waitFor } from '@testing-library/react';
+import '@testing-library/react';
+import type { HTTPHeaders, TRPCLink } from '@trpc/client';
 import {
-  createTRPCProxyClient,
+  createTRPCClient,
   createWSClient,
-  HTTPHeaders,
+  httpBatchLink,
   splitLink,
-  TRPCLink,
   unstable_httpBatchStreamLink,
   wsLink,
-} from '@trpc/client/src';
-import { inferAsyncReturnType, initTRPC } from '@trpc/server';
-import {
+} from '@trpc/client';
+import { initTRPC } from '@trpc/server';
+import type {
   CreateFastifyContextOptions,
-  fastifyTRPCPlugin,
-} from '@trpc/server/src/adapters/fastify';
-import { observable } from '@trpc/server/src/observable';
+  FastifyTRPCPluginOptions,
+} from '@trpc/server/adapters/fastify';
+import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
+import { observable } from '@trpc/server/observable';
 import fastify from 'fastify';
 import fp from 'fastify-plugin';
 import fetch from 'node-fetch';
+import { WebSocket } from 'ws';
 import { z } from 'zod';
 
 const config = {
-  port: 2023,
   logger: false,
   prefix: '/trpc',
 };
 
 function createContext({ req, res, info }: CreateFastifyContextOptions) {
-  const user = { name: req.headers.username ?? 'anonymous' };
+  const user = { name: req.headers['username'] ?? 'anonymous' };
   return { req, res, user, info };
 }
 
-type Context = inferAsyncReturnType<typeof createContext>;
+type Context = Awaited<ReturnType<typeof createContext>>;
 
 interface Message {
   id: string;
@@ -51,6 +52,9 @@ function createAppRouter() {
     ping: publicProcedure.query(() => {
       return 'pong';
     }),
+    echo: publicProcedure.input(z.string()).query(({ input }) => {
+      return input;
+    }),
     hello: publicProcedure
       .input(
         z
@@ -62,7 +66,10 @@ function createAppRouter() {
       .query(({ input, ctx }) => ({
         text: `hello ${input?.username ?? ctx.user?.name ?? 'world'}`,
       })),
-    ['post.edit']: publicProcedure
+    helloMutation: publicProcedure
+      .input(z.string())
+      .mutation(({ input }) => `hello ${input}`),
+    editPost: publicProcedure
       .input(
         z.object({
           id: z.string(),
@@ -116,7 +123,7 @@ function createAppRouter() {
   return { appRouter, ee, onNewMessageSubscription, onSubscriptionEnded };
 }
 
-type CreateAppRouter = inferAsyncReturnType<typeof createAppRouter>;
+type CreateAppRouter = Awaited<ReturnType<typeof createAppRouter>>;
 type AppRouter = CreateAppRouter['appRouter'];
 
 interface ServerOptions {
@@ -150,7 +157,23 @@ function createServer(opts: ServerOptions) {
   instance.register(plugin, {
     useWSS: true,
     prefix: config.prefix,
-    trpcOptions: { router, createContext },
+    trpcOptions: {
+      router,
+      createContext,
+      onError(data) {
+        // report to error monitoring
+        data;
+        // ^?
+      },
+    } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
+  });
+
+  instance.register(async function (fastify) {
+    fastify.get('/ws', { websocket: true }, (socket) => {
+      socket.on('message', (message) => {
+        socket.send(message);
+      });
+    });
   });
 
   instance.get('/hello', async () => {
@@ -164,15 +187,7 @@ function createServer(opts: ServerOptions) {
   const stop = async () => {
     await instance.close();
   };
-  const start = async () => {
-    try {
-      await instance.listen({ port: config.port });
-    } catch (err) {
-      instance.log.error(err);
-    }
-  };
-
-  return { instance, start, stop };
+  return { instance, stop };
 }
 
 const orderedResults: number[] = [];
@@ -185,7 +200,7 @@ const linkSpy: TRPCLink<AppRouter> = () => {
     return observable((observer) => {
       const unsubscribe = next(op).subscribe({
         next(value) {
-          orderedResults.push((value.result as any).data);
+          orderedResults.push(value.result.data as number);
           observer.next(value);
         },
         error: observer.error,
@@ -197,12 +212,13 @@ const linkSpy: TRPCLink<AppRouter> = () => {
 
 interface ClientOptions {
   headers?: HTTPHeaders;
+  port: number | string;
 }
 
-function createClient(opts: ClientOptions = {}) {
-  const host = `localhost:${config.port}${config.prefix}`;
+function createClient(opts: ClientOptions) {
+  const host = `localhost:${opts.port}${config.prefix}`;
   const wsClient = createWSClient({ url: `ws://${host}` });
-  const client = createTRPCProxyClient<AppRouter>({
+  const client = createTRPCClient<AppRouter>({
     links: [
       linkSpy,
       splitLink({
@@ -213,7 +229,6 @@ function createClient(opts: ClientOptions = {}) {
         false: unstable_httpBatchStreamLink({
           url: `http://${host}`,
           headers: opts.headers,
-          AbortController,
           fetch: fetch as any,
         }),
       }),
@@ -223,29 +238,46 @@ function createClient(opts: ClientOptions = {}) {
   return { client, wsClient };
 }
 
+function createBatchClient(opts: ClientOptions) {
+  const host = `localhost:${opts.port}${config.prefix}`;
+  const client = createTRPCClient<AppRouter>({
+    links: [
+      httpBatchLink({
+        url: `http://${host}`,
+        headers: opts.headers,
+        fetch: fetch as any,
+      }),
+    ],
+  });
+
+  return { client };
+}
+
 interface AppOptions {
-  clientOptions?: ClientOptions;
+  clientOptions?: Partial<ClientOptions>;
   serverOptions?: Partial<ServerOptions>;
 }
 
-function createApp(opts: AppOptions = {}) {
+async function createApp(opts: AppOptions = {}) {
   const { appRouter, ee } = createAppRouter();
-  const { instance, start, stop } = createServer({
+  const { instance, stop } = createServer({
     ...(opts.serverOptions ?? {}),
     appRouter,
   });
-  const { client } = createClient(opts.clientOptions);
 
-  return { server: instance, start, stop, client, ee };
+  const url = new URL(await instance.listen({ port: 0 }));
+
+  const { client } = createClient({ ...opts.clientOptions, port: url.port });
+
+  return { server: instance, stop, client, ee, url, opts };
 }
 
-let app: inferAsyncReturnType<typeof createApp>;
+let app: Awaited<ReturnType<typeof createApp>>;
 
 describe('anonymous user', () => {
   beforeEach(async () => {
     orderedResults.length = 0;
-    app = createApp();
-    await app.start();
+    app = await createApp();
   });
 
   afterEach(async () => {
@@ -254,7 +286,7 @@ describe('anonymous user', () => {
 
   test('fetch POST', async () => {
     const data = { text: 'life', life: 42 };
-    const req = await fetch(`http://localhost:${config.port}/hello`, {
+    const req = await fetch(`http://localhost:${app.url.port}/hello`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -294,7 +326,7 @@ describe('anonymous user', () => {
 
   test('mutation', async () => {
     expect(
-      await app.client['post.edit'].mutate({
+      await app.client.editPost.mutate({
         id: '42',
         data: { title: 'new_title', text: 'new_text' },
       }),
@@ -303,6 +335,42 @@ describe('anonymous user', () => {
         "error": "Unauthorized user",
       }
     `);
+  });
+
+  test('batched requests in body work correctly', async () => {
+    const { client } = createBatchClient({
+      ...app.opts.clientOptions,
+      port: app.url.port,
+    });
+
+    const res = await Promise.all([
+      client.helloMutation.mutate('world'),
+      client.helloMutation.mutate('KATT'),
+    ]);
+    expect(res).toEqual(['hello world', 'hello KATT']);
+  });
+
+  test('does not bind other websocket connection', async () => {
+    const client = new WebSocket(`ws://localhost:${app.url.port}/ws`);
+
+    await new Promise<void>((resolve, reject) => {
+      client.once('open', () => {
+        client.send('hello');
+        resolve();
+      });
+
+      client.once('error', reject);
+    });
+
+    const promise = new Promise<string>((resolve) => {
+      client.once('message', resolve);
+    });
+
+    const message = await promise;
+
+    expect(message.toString()).toBe('hello');
+
+    client.close();
   });
 
   test('subscription', async () => {
@@ -328,7 +396,7 @@ describe('anonymous user', () => {
       },
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(onStartedMock).toHaveBeenCalledTimes(1);
       expect(onDataMock).toHaveBeenCalledTimes(2);
     });
@@ -337,7 +405,7 @@ describe('anonymous user', () => {
       id: '3',
     });
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(onDataMock).toHaveBeenCalledTimes(3);
     });
 
@@ -363,7 +431,7 @@ describe('anonymous user', () => {
 
     sub.unsubscribe();
 
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(app.ee.listenerCount('server:msg')).toBe(0);
       expect(app.ee.listenerCount('server:error')).toBe(0);
     });
@@ -382,8 +450,7 @@ describe('anonymous user', () => {
 
 describe('authorized user', () => {
   beforeEach(async () => {
-    app = createApp({ clientOptions: { headers: { username: 'nyan' } } });
-    await app.start();
+    app = await createApp({ clientOptions: { headers: { username: 'nyan' } } });
   });
 
   afterEach(async () => {
@@ -401,22 +468,30 @@ describe('authorized user', () => {
   test('request info', async () => {
     const info = await app.client.request.info.query();
 
+    if (info.url) {
+      info.url = info.url.replace(/:\d+\//, ':<<redacted>>/');
+    }
+
     expect(info).toMatchInlineSnapshot(`
       Object {
+        "accept": "application/jsonl",
         "calls": Array [
           Object {
             "path": "request.info",
-            "type": "query",
           },
         ],
+        "connectionParams": null,
         "isBatchCall": true,
+        "signal": Object {},
+        "type": "query",
+        "url": "http://localhost:<<redacted>>/trpc/request.info?batch=1&input=%7B%7D",
       }
-  `);
+    `);
   });
 
   test('mutation', async () => {
     expect(
-      await app.client['post.edit'].mutate({
+      await app.client.editPost.mutate({
         id: '42',
         data: { title: 'new_title', text: 'new_text' },
       }),
@@ -432,8 +507,7 @@ describe('authorized user', () => {
 
 describe('anonymous user with fastify-plugin', () => {
   beforeEach(async () => {
-    app = createApp({ serverOptions: { fastifyPluginWrapper: true } });
-    await app.start();
+    app = await createApp({ serverOptions: { fastifyPluginWrapper: true } });
   });
 
   afterEach(async () => {
@@ -441,13 +515,13 @@ describe('anonymous user with fastify-plugin', () => {
   });
 
   test('fetch GET', async () => {
-    const req = await fetch(`http://localhost:${config.port}/hello`);
+    const req = await fetch(`http://localhost:${app.url.port}/hello`);
     expect(await req.json()).toEqual({ hello: 'GET' });
   });
 
   test('fetch POST', async () => {
     const data = { text: 'life', life: 42 };
-    const req = await fetch(`http://localhost:${config.port}/hello`, {
+    const req = await fetch(`http://localhost:${app.url.port}/hello`, {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -458,7 +532,7 @@ describe('anonymous user with fastify-plugin', () => {
     // body should be string
     expect(await req.json()).toMatchInlineSnapshot(`
       Object {
-        "body": "{\\"text\\":\\"life\\",\\"life\\":42}",
+        "body": "{"text":"life","life":42}",
         "hello": "POST",
       }
     `);
@@ -486,13 +560,12 @@ describe('anonymous user with fastify-plugin', () => {
 // https://github.com/trpc/trpc/issues/4820
 describe('regression #4820 - content type parser already set', () => {
   beforeEach(async () => {
-    app = createApp({
+    app = await createApp({
       serverOptions: {
         fastifyPluginWrapper: true,
         withContentTypeParser: true,
       },
     });
-    await app.start();
   });
 
   afterEach(async () => {
@@ -501,5 +574,24 @@ describe('regression #4820 - content type parser already set', () => {
 
   test('query', async () => {
     expect(await app.client.ping.query()).toMatchInlineSnapshot(`"pong"`);
+  });
+});
+
+// https://github.com/trpc/trpc/issues/5530
+describe('issue #5530 - cannot receive new WebSocket messages after receiving 16 kB', () => {
+  beforeEach(async () => {
+    app = await createApp();
+  });
+
+  afterEach(async () => {
+    await app.stop();
+  });
+
+  test('query', async () => {
+    const data = 'A'.repeat(8192);
+
+    for (let i = 0; i < 4; i++) {
+      expect(await app.client.echo.query(data)).toBe(data);
+    }
   });
 });

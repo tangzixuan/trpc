@@ -1,7 +1,6 @@
-import { waitFor } from '@testing-library/dom';
-import { AnyRouter } from '@trpc/server/src';
-import { observable } from '@trpc/server/src/observable';
-import { OperationLink } from '../..';
+import { observable } from '@trpc/server/observable';
+import type { AnyRouter } from '@trpc/server/unstable-core-do-not-import';
+import type { OperationLink } from '../..';
 import { createChain } from './createChain';
 import { dedupeLink } from './dedupeLink';
 
@@ -41,6 +40,7 @@ test('dedupeLink', async () => {
         input: 'world',
         path: 'hello',
         context: {},
+        signal: null,
       },
     });
 
@@ -52,6 +52,7 @@ test('dedupeLink', async () => {
         input: 'world',
         path: 'hello',
         context: {},
+        signal: null,
       },
     });
     const next = vi.fn();
@@ -59,7 +60,7 @@ test('dedupeLink', async () => {
     call2.subscribe({ next });
 
     expect(endingLinkTriggered).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(timerTriggered).toHaveBeenCalledTimes(1);
     });
 
@@ -104,6 +105,7 @@ test('dedupe - cancel one does not cancel the other', async () => {
         input: 'world',
         path: 'hello',
         context: {},
+        signal: null,
       },
     });
 
@@ -115,6 +117,7 @@ test('dedupe - cancel one does not cancel the other', async () => {
         input: 'world',
         path: 'hello',
         context: {},
+        signal: null,
       },
     });
     const next = vi.fn();
@@ -123,7 +126,7 @@ test('dedupe - cancel one does not cancel the other', async () => {
     call1$.unsubscribe();
 
     expect(endingLinkTriggered).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
+    await vi.waitFor(() => {
       expect(timerTriggered).toHaveBeenCalledTimes(1);
 
       expect(next).toHaveBeenCalledTimes(1);

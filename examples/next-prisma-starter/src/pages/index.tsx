@@ -1,12 +1,12 @@
 import { trpc } from '../utils/trpc';
-import { NextPageWithLayout } from './_app';
-import { inferProcedureInput } from '@trpc/server';
+import type { NextPageWithLayout } from './_app';
+import type { inferProcedureInput } from '@trpc/server';
 import Link from 'next/link';
 import { Fragment } from 'react';
 import type { AppRouter } from '~/server/routers/_app';
 
 const IndexPage: NextPageWithLayout = () => {
-  const utils = trpc.useContext();
+  const utils = trpc.useUtils();
   const postsQuery = trpc.post.list.useInfiniteQuery(
     {
       limit: 5,
@@ -72,8 +72,8 @@ const IndexPage: NextPageWithLayout = () => {
           {postsQuery.isFetchingNextPage
             ? 'Loading more...'
             : postsQuery.hasNextPage
-            ? 'Load More'
-            : 'Nothing more to load'}
+              ? 'Load More'
+              : 'Nothing more to load'}
         </button>
 
         {postsQuery.data?.pages.map((page, index) => (
@@ -164,7 +164,7 @@ export default IndexPage;
  * - Export `appRouter` & `createContext` from [trpc].ts
  * - Make the `opts` object optional on `createContext()`
  *
- * @link https://trpc.io/docs/ssg
+ * @see https://trpc.io/docs/v11/ssg
  */
 // export const getStaticProps = async (
 //   context: GetStaticPropsContext<{ filter: string }>,

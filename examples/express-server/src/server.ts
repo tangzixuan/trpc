@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { inferAsyncReturnType, initTRPC, TRPCError } from '@trpc/server';
+import { initTRPC, TRPCError } from '@trpc/server';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import express from 'express';
 import { z } from 'zod';
@@ -23,7 +23,7 @@ const createContext = ({
     user: getUser(),
   };
 };
-type Context = inferAsyncReturnType<typeof createContext>;
+type Context = Awaited<ReturnType<typeof createContext>>;
 
 const t = initTRPC.context<Context>().create();
 
@@ -124,7 +124,9 @@ async function main() {
       createContext,
     }),
   );
-  app.get('/', (_req, res) => res.send('hello'));
+  app.get('/', (_req, res) => {
+    res.send('hello');
+  });
   app.listen(2021, () => {
     console.log('listening on port 2021');
   });

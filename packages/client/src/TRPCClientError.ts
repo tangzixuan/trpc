@@ -1,14 +1,22 @@
-import { DefaultErrorShape, Maybe } from '@trpc/server';
-import { TRPCErrorResponse } from '@trpc/server/rpc';
-import { inferErrorShape, TRPCInferrable } from '@trpc/server/shared';
-import { isObject } from './internals/isObject';
+import type {
+  inferClientTypes,
+  InferrableClientTypes,
+  Maybe,
+  TRPCErrorResponse,
+} from '@trpc/server/unstable-core-do-not-import';
+import {
+  isObject,
+  type DefaultErrorShape,
+} from '@trpc/server/unstable-core-do-not-import';
 
+type inferErrorShape<TInferrable extends InferrableClientTypes> =
+  inferClientTypes<TInferrable>['errorShape'];
 export interface TRPCClientErrorBase<TShape extends DefaultErrorShape> {
   readonly message: string;
   readonly shape: Maybe<TShape>;
   readonly data: Maybe<TShape['data']>;
 }
-export type TRPCClientErrorLike<TInferrable extends TRPCInferrable> =
+export type TRPCClientErrorLike<TInferrable extends InferrableClientTypes> =
   TRPCClientErrorBase<inferErrorShape<TInferrable>>;
 
 function isTRPCClientError(cause: unknown): cause is TRPCClientError<any> {
@@ -25,17 +33,29 @@ function isTRPCClientError(cause: unknown): cause is TRPCClientError<any> {
 function isTRPCErrorResponse(obj: unknown): obj is TRPCErrorResponse<any> {
   return (
     isObject(obj) &&
-    isObject(obj.error) &&
-    typeof obj.error.code === 'number' &&
-    typeof obj.error.message === 'string'
+    isObject(obj['error']) &&
+    typeof obj['error']['code'] === 'number' &&
+    typeof obj['error']['message'] === 'string'
   );
 }
 
-export class TRPCClientError<TRouterOrProcedure extends TRPCInferrable>
+function getMessageFromUnknownError(err: unknown, fallback: string): string {
+  if (typeof err === 'string') {
+    return err;
+  }
+  if (isObject(err) && typeof err['message'] === 'string') {
+    return err['message'];
+  }
+  return fallback;
+}
+
+export class TRPCClientError<TRouterOrProcedure extends InferrableClientTypes>
   extends Error
   implements TRPCClientErrorBase<inferErrorShape<TRouterOrProcedure>>
 {
-  public readonly cause;
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore override doesn't work in all environments due to "This member cannot have an 'override' modifier because it is not declared in the base class 'Error'"
+  public override readonly cause;
   public readonly shape: Maybe<inferErrorShape<TRouterOrProcedure>>;
   public readonly data: Maybe<inferErrorShape<TRouterOrProcedure>['data']>;
 
@@ -48,7 +68,7 @@ export class TRPCClientError<TRouterOrProcedure extends TRPCInferrable>
   constructor(
     message: string,
     opts?: {
-      result?: Maybe<inferErrorShape<TRouterOrProcedure>>;
+      result?: Maybe<TRPCErrorResponse<inferErrorShape<TRouterOrProcedure>>>;
       cause?: Error;
       meta?: Record<string, unknown>;
     },
@@ -69,8 +89,8 @@ export class TRPCClientError<TRouterOrProcedure extends TRPCInferrable>
     Object.setPrototypeOf(this, TRPCClientError.prototype);
   }
 
-  public static from<TRouterOrProcedure extends TRPCInferrable>(
-    _cause: Error | TRPCErrorResponse<any>,
+  public static from<TRouterOrProcedure extends InferrableClientTypes>(
+    _cause: Error | TRPCErrorResponse<any> | object,
     opts: { meta?: Record<string, unknown> } = {},
   ): TRPCClientError<TRouterOrProcedure> {
     const cause = _cause as unknown;
@@ -91,16 +111,12 @@ export class TRPCClientError<TRouterOrProcedure extends TRPCInferrable>
         result: cause,
       });
     }
-    if (!(cause instanceof Error)) {
-      return new TRPCClientError('Unknown error', {
+    return new TRPCClientError(
+      getMessageFromUnknownError(cause, 'Unknown error'),
+      {
         ...opts,
         cause: cause as any,
-      });
-    }
-
-    return new TRPCClientError(cause.message, {
-      ...opts,
-      cause,
-    });
+      },
+    );
   }
 }

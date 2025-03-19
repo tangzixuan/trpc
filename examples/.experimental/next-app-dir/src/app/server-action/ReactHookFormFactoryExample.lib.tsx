@@ -6,20 +6,22 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { UseTRPCActionResult } from '@trpc/next/app-dir/client';
-import { TRPCActionHandler } from '@trpc/next/app-dir/server';
-import { ActionHandlerDef } from '@trpc/next/dist/app-dir/shared';
+import type { UseTRPCActionResult } from '@trpc/next/app-dir/client';
+import type {
+  ActionHandlerDef,
+  TRPCActionHandler,
+} from '@trpc/next/app-dir/server';
 import { useAction } from '~/trpc/client';
+import type { JSX } from 'react';
 import { useRef } from 'react';
+import type { UseFormProps, UseFormReturn } from 'react-hook-form';
 import {
   FormProvider,
   useForm,
   useFormContext,
-  UseFormProps,
-  UseFormReturn,
   useWatch,
 } from 'react-hook-form';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 export function createForm<TDef extends ActionHandlerDef>(opts: {
   action: TRPCActionHandler<TDef>;
@@ -50,7 +52,7 @@ export function createForm<TDef extends ActionHandlerDef>(opts: {
       <FormProvider {...hook}>
         <form
           {...passThrough}
-          action={opts.action}
+          action={opts.action as any}
           ref={ref}
           onSubmit={hook.handleSubmit(() =>
             action.mutateAsync(new FormData(ref.current!) as any),
